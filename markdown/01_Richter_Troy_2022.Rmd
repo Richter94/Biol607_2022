@@ -1,0 +1,56 @@
+---
+title: "Homework 1 Intro to R!"
+author: "Troy Richter"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Exploring the data-set quakes which looks at earthquakes off of Fiji
+
+## 1. Stirring and Summarizing Quakes
+
+```{r}
+
+data(quakes)
+str(quakes)
+summary(quakes)
+```
+
+## 2. Showing the entirety of the column long
+
+```{r}
+# Showing the entirety of the column long
+quakes[["long"]]
+```
+
+## 3. Applying Unique to a vector and showing how many unique stations there are.
+
+```{r}
+#  Applying unique() to a vector
+unique(quakes[["long"]])
+
+# How many unique stations are there? 
+length(unique(quakes[["stations"]]))
+```
+
+## 4. Finding the range of depth where quakes occur
+
+```{r}
+# what is the range of the depths where quakes occur
+range(quakes$depth)
+```
+
+## 5. Trying to impress myself
+
+```{r}
+# Impressing myself: Where was the earthquake of the largest magnitude found?
+quakes[which.max(quakes[["mag"]]), c("lat", "long", "mag")]
+```
+
+### Meta questions:
+
+Meta1: This week felt great as an intro to R. It felt informative while not going too fast. This language has an easy to understand syntax. I appreciated the real world examples of data (quakes, cars etc...).
+
+Meta2: This homework took me roughly 1 hour to complete with the last question taking the most time.
+
+Meta3: I would say I had a strong grasp of this assignment. The prompt were clear and I could use the skills I developed on Friday for the data. Also I think that the last question was hard enough to warrant me looking on google/past lectures to find the secret function that could get it to work. Doing so reminded me of the different output types (list, or vector) that certain index formats can return.
