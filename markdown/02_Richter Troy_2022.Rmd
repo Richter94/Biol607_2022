@@ -1,0 +1,165 @@
+---
+title: "Homework 2 ggplot"
+author: "Troy Richter"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Setup the code
+
+```{r}
+#loading the libraries
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(forcats)
+library(ggridges)
+
+#setting the theme
+theme_set(theme_bw(base_size = 12))
+
+ice <- read_csv("http://biol607.github.io/homework/data/NH_seaice_extent_monthly_1978_2016.csv") %>%
+  mutate(Month_Name = factor(Month_Name),
+         Month_Name = fct_reorder(Month_Name, Month))
+
+```
+
+# Boxplots
+
+Make a boxplot showing the variability in sea ice extent every month IYKYK fancy
+
+```{r}
+ggplot(data = ice,
+       mapping = aes(x = Month_Name,
+       y = Extent,
+       ))+
+  geom_boxplot() +
+  stat_boxplot() +
+  scale_x_discrete(limits = rev) +
+  labs(title = "Extent of Sea Ice Every Month",
+       x = "Month",
+       y = "Extent (Mil km^2)")
+
+
+```
+
+# Ridgelines
+
+Use ggridges to do the same thing. What is different
+
+```{r}
+#Have to flip the scale so that it started with jan
+ggplot(data = ice,
+       mapping = aes(x = Extent,
+       y = Month_Name,
+       ))+
+  geom_density_ridges() +
+  scale_y_discrete(limits = rev) +
+  labs(title = "Distribution of the Extent of Sea Ice every Month",
+       subtitle = "From 1978-2016",
+       x = "Extent (Mil km^2)",
+       y = "Month")
+
+```
+
+This interestingly did not work with the x and y flipped (months on the x). I think because it would have to show distributions in a different directions which isn't coded.
+
+# Making Groups from the Continuous
+
+```{r}
+ggplot(data = ice,
+       mapping = aes(x = Year,
+       y = Extent,
+       )) +
+  geom_line() +
+  geom_point(size = 1) +
+  #scale_y_discrete(limits = rev) +
+  facet_wrap(facets = vars(cut_interval(Month, n=4), ))+
+  labs(title = "Distribution of the Extent of Sea Ice every Month",
+       subtitle = "From 1978-2016",
+       x = "Year",
+       y = "Extent (Mil km^2)")
+```
+
+# Use that color!
+
+Making a line plot of sea ice by month with different lines as different years. Also will be gussied up with colors by year, different theme, critical values, and other things to show the data also will attempt color findr
+
+```{r}
+#don't forget to install package install.packages("colorfindr")
+library(colorfindr)
+
+#getting colors from the Icelandic flag and plotting their hex code
+iceland <- get_colors(
+  img = "https://upload.wikimedia.org/wikipedia/commons/c/ce/Flag_of_Iceland.svg"
+) %>%
+  make_palette (n = 3)
+  
+# cleaning it and making it nice
+ice_month <- ggplot(data = ice,
+       mapping = aes(x = Month_Name,
+       y = Extent)) +
+  geom_line(aes(group = Year, color = Year)) +
+  labs(title = "Distribution of the Amount of Arctic Sea Ice",
+       subtitle = "From 1978-2016",
+       x = "Month",
+       y = "Extent (Mil km^2)")
+#adding the Icelandic flag theme to the plot
+ice_month +
+  scale_color_gradientn(colors = iceland)
+
+```
+
+# IYKYK 1: Animating
+
+```{r}
+#dont forget to install the packages below
+library(gganimate)
+library(transformr)
+library(gifski)
+library(png)
+#plot
+ice_month <- ggplot(data = ice,
+       mapping = aes(x = Month_Name,
+       y = Extent)) +
+  geom_line(aes(group = Year, color = Year)) +
+  labs(title = "Distribution of the Amount of Arctic Sea Ice",
+       subtitle = "From 1978-2016",
+       x = "Month",
+       y = "Extent (Mil km^2)")+
+  scale_color_gradientn(colors = iceland)
+ice_month
+#animating
+ice_month_gif <- ice_month +
+  transition_reveal(along =  as.integer(Year)) +
+  ease_aes('linear') +
+  labs(tag = "Year: {frame_along}")
+animate(ice_month_gif, renderer = gifski_renderer(file = "iceland.gif"))
+```
+
+# IYKYK 2: Making something new
+####All time
+```{r}
+ice_all <- ggplot(data= ice,
+                  mapping = aes(x = Year,
+                                y = Extent))+
+  geom_line(aes(group = Month_Name, color = Month_Name))
+ice_all +
+  scale_color_viridis_d()+
+  labs(title = "Extent of the sea Ice from 1978-2015 by Month", 
+       y = "Extent (Mil km^2)", 
+       color = "Month")
+```
+
+
+Meta 1:
+I was generally confident in subject matter regarding making figs but after learning ggplot2 I am now more confident in thinking about how to represent different types of data. 
+
+Meta 2:
+My favorite thing about data viz is that you can say so much just by generating a figure. It is a good way to have something pop out at you that was otherwise hidden. 
+
+Meta 3:
+This took me a while because of how gganim was behaving. I spent about 2 hours on it on sunday and then about 2 hours on it on monday. 
+
+Meta 4:
+I think I am not sufficient to strong on this assignment. It took me a while to grasp the syntax and how to incorporate the gganim. Also the color palette will take time to just know the names of the different palettes. Otherwise I have a good understanding. 
