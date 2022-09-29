@@ -1,0 +1,188 @@
+# Tidy Data Homework
+
+### Loading in the data
+
+```{r}
+# Always library
+library(readr)
+library(here)
+library(dplyr)
+# Loading in the data
+# Setting the WD
+setwd(here())
+
+# not downloading it loading in data
+kelp <- read_csv("https://github.com/kelpecosystems/observational_data/blob/master/cleaned_data/keen_cover.csv?raw=true")
+
+#Downloading it
+kelp_down <- read_csv("data/keen_cover.csv")
+
+```
+
+### Formating
+
+```{r}
+# exploring the data
+head(kelp)
+```
+
+This data is in a long format because each value in the first column is repeating as it goes down. If it were wide the first column would have unique values as it descended.
+
+### Checking it out
+
+#### How many sites has each PI done
+
+```{r}
+# how many sites has each pi done
+kelp |>
+  group_by(PI) |>
+  summarise(SITE_count = n_distinct(SITE))
+```
+
+#### How many years of data does each site have?
+
+```{r}
+# How many years of data does each site have?
+kelp |>
+  group_by(SITE) |>
+  summarize(year_count = n_distinct(YEAR)) |>
+  ungroup() |>
+# in descending order
+  arrange(desc(year_count))
+
+```
+
+#### IYKYK making a fig showing which site sampled when
+
+```{r}
+#Impressing by making a figure showing which site was sampled when
+library(ggplot2)
+
+ggplot(kelp, 
+       mapping = aes(x = YEAR,
+                     y = SITE,
+                     color = SITE,
+                     fill = SITE))+
+  geom_tile()
+```
+
+### Looking at some Kelp
+
+### Trimming to the right columns
+
+```{r}
+# Trimming to columns YEAR, SITE, TRANSECT, %COVER, FAM, and Species
+
+kelp |>  
+  select(YEAR, SITE, TRANSECT, PERCENT_COVER, FAMILY, SPECIES)
+
+```
+
+#### Trimming so only the right family is shown and then ditch the rest of the col
+
+```{r}
+# trimming the data so only "Laminariaceae" are shown then ditched the rest of the column
+kelp |> 
+  select(YEAR, SITE, TRANSECT, PERCENT_COVER, FAMILY, SPECIES) |>
+  filter(FAMILY == "Laminariaceae") |> 
+  select(!FAMILY)
+```
+
+#### Checking to see if there is only one measurement for each transect each year per species
+
+```{r}
+# Checking to see if there is only one measurement for transect each year per species. 
+kelp_one_meas <- kelp |>
+  select(YEAR, SITE, TRANSECT, PERCENT_COVER, FAMILY, SPECIES) |>
+  filter(FAMILY == "Laminariaceae") |> 
+  select(!FAMILY)|>
+  count(SPECIES, TRANSECT, YEAR, SITE)
+kelp_one_meas
+```
+
+#### Summing the cover for each species transect per year
+
+```{r}
+# Summing the cover for each species transect per year
+kelp_plot <- kelp |>
+  select(YEAR, SITE, TRANSECT, PERCENT_COVER, FAMILY, SPECIES) |>
+  filter(FAMILY == "Laminariaceae") |> 
+  select(!FAMILY)|>
+  group_by(SPECIES, TRANSECT, YEAR, SITE)|>
+  summarise(sum_cover = sum(PERCENT_COVER))
+kelp_plot
+
+```
+
+#### Making a plot showing the time of kelps at each site
+
+```{r}
+# Making a plot for showing the time of kelps at each site
+ggplot(kelp_plot,
+       mapping = aes(x = YEAR,
+                     y = sum_cover,
+                     group = SITE,
+                     color = SITE))+
+  stat_summary(geom = "line") +
+  stat_summary(geom = "point") +
+  facet_grid(cols = vars(SPECIES))
+```
+
+### Wide Relationships
+
+#### Pivoting wider
+
+```{r}
+library(tidyr)
+#pivoting wider
+#replacing NAs as 0
+kelp_plot_wide <- kelp_plot |>
+  pivot_wider(names_from = SPECIES,
+              values_from = sum_cover,
+              values_fill = 0)
+kelp_plot_wide
+```
+
+#### Examining if there is a relationship between the two
+
+```{r}
+ggplot(kelp_plot_wide,
+       mapping = aes(x = `Laminaria digitata`,
+                     y = `Saccharina latissima`))+
+  stat_summary()+
+  stat_smooth(method = "lm")
+```
+
+It doesn't look like there is a relationship between the two species of kelp per transect location year as the stat_smooth line is basically flat. This suggests that the cover of the respective species are not influenced by each other
+
+#### Pivoting back to long
+
+```{r}
+# Pivoting long
+
+kelp_plot_longer <- kelp_plot_wide|>
+  pivot_longer(cols = ends_with("a"), 
+               names_to = "Species",
+               values_to = "Cover")
+kelp_plot_longer
+ggplot(kelp_plot_longer,
+        mapping = aes(x = YEAR,
+                     y = Cover,
+                     group = SITE,
+                     color = SITE))+
+  stat_summary(geom = "line") +
+  stat_summary(geom = "point") +
+  facet_grid(cols = vars(Species))
+```
+
+It looks only slightly different in that the points align to 0 instead of not being plotted on the Laminaria species plot. It appears to be more complete but not really more informative. It also could be misleading as the NA suggest that it wasn't charted but not actually a true 0.
+
+Meta 1: I felt okay working with it in the first part of the homework like dropping columns and finding out things about the data, however because I unfamiliar with what the data actually was it was hard for me to visualize what was acutally being collected (like what a transect was).
+
+Meta 2: Split-Apply-Combine is something that I may have completed in the past without actually knowing what it was.
+
+Meta 3: I typically make data sets that are long because each animal is sepearated out instead of their group assignments. However when plotting I desire to collapse the groups having the data represent groups. Advice to future me would be to think of data in these seperate formats to aid in the proper processing of them to make sure that my plot tells the right story.
+
+Meta 4: This took me a while because some of the questions were hard to understand what the goal was. This took me perhaps 5-7 hours split up over the week.
+
+Meta 5: I give this a strong in the end but perhaps while I was doing it and while I was learning it I would say a sufficient. It was difficult for me to understand the goal of some of the questions. So in that regard it was hard to picture the end and that informs the steps.
