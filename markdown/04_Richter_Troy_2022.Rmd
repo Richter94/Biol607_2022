@@ -1,0 +1,196 @@
+# Iteration and Function Homework
+
+## Intro
+
+```{r}
+# Loading in the packages to use and setting a ggplot theme
+library(tidyverse)
+library(ggplot2)
+theme_set(theme_classic(base_size = 12))
+```
+
+### Basic function and iteration
+
+Write a function with no arguments but tells you "You're doing a great job!
+
+```{r}
+# Hint use cat(), paste(), or print()
+affirmation <- function(x) {
+  paste("You're doing a great job!")
+}
+```
+
+Having it tell me this 10 times
+
+```{r}
+#Using replicate() for the first five and map_chr() for the second 5
+replicate(5, affirmation())
+
+map_chr(1:5, affirmation)
+```
+
+Difference here is no parentheses on the function and you have to give it 1:5 as iteration
+
+attempting purrr:::walk()
+
+```{r}
+#trying walk()
+walk(1:5, affirmation)
+```
+
+The difference here is that it will return the input invisibly so you can use it in pipes easier. If I wanted this function to work then in my function I would change paste to cat.
+
+## Visualizing the Exponential Distribution
+
+Writing a function that will take a rate, min and max as inputs returning data frame or tibble with 3 cols.
+
+```{r}
+rate_func <- function(rate,
+                      mini = 0,
+                      maxi = 4) {
+  minmax <- seq(from = mini, to = maxi, length.out = 100)
+  probdens <- dexp(minmax,
+                   rate = rate)
+  
+  data.frame(rate,
+             minmax,
+             probdens)
+}
+#testing with a ggplot at rate = 3
+testplot <- rate_func(rate = 3)
+ggplot(testplot,
+       mapping = aes(x = minmax, y = probdens))+
+  geom_line()+
+  xlab("Value")+
+  ylab("Density")
+```
+
+Using map_df and a vector of rates to make a df or tibble with above function which for each rate has values of x and prob dens of x
+
+```{r}
+vec_plot <- map_df(c(0.2, 0.5, 1, 2, 4), rate_func)
+
+
+```
+
+Plotting the result
+
+```{r}
+ggplot(vec_plot, mapping = aes(x = minmax,
+                               y = probdens,
+                               color = rate))+
+  geom_point()+
+  xlab("Value")+
+  ylab("Density")
+```
+
+This generally makes sense to me. As the rate is high (rate = 4), then it is a bigger exponential distribution and when the rate is tiny then the density effected by value is more uniform?
+
+## Precision and Sampling the Exponential
+
+Writing a function that will return a df of that vector with the mean and median.
+
+```{r}
+medmean <- function(x){
+  #avg <- mean(x)
+  #medi <- median(x)
+  ret <- data.frame(mean = mean(x), median = median(x))
+  return(ret)
+}
+# Testing the func
+
+medmean(c(1,2,3,3,3))
+```
+
+Writing a function that given a sample size and a rate will take a sample from an exponential distribution and then use the above function to return the mean and median as a data frame.
+
+```{r}
+set.seed(614)
+# function
+exp_samp <- function(samp_size,
+                     rate){
+  #sample from an exponential dist
+  samp <- rexp(samp_size, rate = rate)
+  tib <- medmean(samp)
+  return(tib)
+}
+
+#setting the seed for testing
+set.seed(614)
+test <- rexp(5, 4)
+mean(test)
+median(test) 
+set.seed(614)
+exp_samp(5, 4) #Success
+```
+
+Writing a function that given sample size rate and number of sims (def 1e3) returns a df with however many rows of means and medians given sims. Test with plotting for rate = 2 and samp size = 10.
+
+```{r}
+exp_samp_itr <- function(iterations = 1e3,
+                         samp_size,
+                         rate){
+  map_df(1:iterations,
+         ~ exp_samp(samp_size, rate))
+}
+
+set.seed(123)
+test_plot2 <- exp_samp_itr(samp_size = 10, rate = 2)
+ggplot(test_plot2,
+       mapping = aes(x = mean,
+                     y = median))+
+  geom_point()
+
+```
+
+I am unsure how using pivot_longer() here would help my plot any.
+
+Bringing the function crossing() to make a tibble with all possible combo of sample sizes c(3,5,7,9) and rate c(1, 1.5, 2, 4,)
+
+```{r}
+crossed_tibb <- crossing(sample_size = c(3,5,7,9),
+                         rate = c(1,1.5,2,4))
+crossed_tibb
+```
+
+Using group_by on sample size and rate and summarise on combo with the sim function to get sim at all parameter combos
+
+```{r}
+crossed_tibb_iter <- crossed_tibb|>
+  group_by(sample_size, rate)|>
+  summarise(exp_samp_itr(samp_size = sample_size, rate = rate))
+#plot
+ggplot(crossed_tibb_iter,
+       mapping = aes(x = mean,
+                     y = median))+
+  facet_grid(rows = vars(sample_size), cols = vars(rate), 
+             labeller = label_both)+
+  geom_point()
+```
+
+Grouping again and calculating the SD of each measure. Then plotting the curves showing the influence of sample size on precision of our estimate on mean and median.
+
+```{r}
+crossed_tibb_iter|>
+  group_by(sample_size, rate)|>
+  summarise(sample_size, rate, sd_mean = sd(mean), sd_median = sd(median), median, mean)|>
+  ggplot(mapping = aes(x = sample_size,
+                       y = sd_mean,
+                       group = rate,
+                       color = rate))+
+  geom_line()
+```
+
+This tells me that a higher sample size will get a more precise measure as the SD will be low. But, this is highly affected by the rate. A higher rate will not change the requirements of sample size that much but when the rate is lower the sample size has greater influence. A higher sample size will always yield a higher precise measure.
+
+Meta 1: All of this was new to me in R and in stats. In the end it made generally the same amount of sense but some stuff required re-learning and kinda scary because I don't think my work tends to line up here. useful nonetheless.
+
+Meta 2: Using function is useful and I could use them to help clean data packages and organize data cleanly across many excel files. Iteration I think I would use less but it would require more thought on my end to see if the idea of iteration can be adapted to my work.
+
+Meta 3: This felt great in the begginning and then at the end it was a steep learning curve. I had the grasp on the function and such but the way the questions were written threw me off on how to get the write plots. I also didn't pivot once and got the correct answers despite being urged to do so. Lightbulps did go off in the end about the plot that was asked only after extensive googling.
+
+Meta 4: The old friends I am becoming comfortable with. I think generally I have a firm grasp on all these functions and tools.
+
+Meta 5: This took me around 6 hours across a few days so a few hours a day.
+
+Meta 6: I would give myself sufficient to strong only in retrospect because I always stuggle with what is being asked and what the goal is. Getting there doesn't seem to be a problem when I know what the goal is.
