@@ -1,0 +1,172 @@
+# Correlation and Regression Homework
+
+## Correlation
+Displaying the association between the two variables in a scatter plot
+```{r}
+# loading necessities
+library(here)
+library(tidyverse)
+library(ggplot2)
+library(broom)
+library(performance)
+library(modelr)
+# setting the location
+setwd(here())
+
+# Getting the data
+brains <- read.csv("data/chap16q15LanguageGreyMatter.csv")
+
+# plotting the data
+brains|>
+  ggplot(mapping = aes(x = proficiency,
+                       y = greymatter))+
+  geom_point()
+```
+
+Calculating the correlation between second language proficiency and gray-matter density
+```{r}
+# modeling the correlation
+brain_lm <- lm(greymatter ~ proficiency, data = brains)
+brain_lm
+
+glance(brain_lm)
+```
+The correlation between the second language proficiency and greymatter volume is ~0.67.
+
+Checking the assumptions
+```{r}
+check_model(brain_lm)
+summary(brain_lm)
+```
+The assumptions are linearity, homogeneity of variance, normality, and independence. Here I would assess that the data is independent as no points are outside the lines. The data is pretty normal and most of the points are on the line. The homogeneity of variance seems a little crazy and it doesn't seem like the linearity is too good either. I would say our model generally fits. 
+
+Does the scatter plot support these assumptions?
+
+I would say it does because it aligns nicely with the fitted line showing a linear relationship????
+```{r}
+brain_lm |>
+  ggplot(mapping = aes(x = proficiency,
+                       y = greymatter))+
+  geom_point()+
+  stat_smooth(method = lm)
+```
+
+## Plant Nutrients
+Drawing the scatter plot of the data
+```{r}
+plants <- read_csv("https://whitlockschluter.zoology.ubc.ca/wp-content/data/chapter17/chap17q19GrasslandNutrientsPlantSpecies.csv")
+
+plant_plot <- plants |>
+  ggplot(mapping = aes(x = nutrients,
+                       y = species))+
+  geom_point()
+plant_plot
+```
+
+What is the rate of change in the number of species supported per nutrient type added with SE. 
+```{r}
+plant_lm <- lm(species ~ nutrients, data = plants)
+plant_lm
+summary(plant_lm)
+```
+For every unit of nutrients the species supported decreases 3.339 with a standard error of 1.098.
+
+Add the least squares regression line to the scatter plot. What fraction of the variation is explained by nutrients
+```{r}
+plant_lm|>
+  ggplot(mapping = aes(x = nutrients,
+                       y = species))+
+  geom_point()+
+  stat_smooth(method = "lm")
+# to find the rsq
+glance(plant_lm)
+```
+47.8% of the variance of species is explained by the nutrients. 
+
+## Bugs
+```{r}
+#loading in bugs
+bugs <- read_csv("https://whitlockschluter.zoology.ubc.ca/wp-content/data/chapter17/chap17q25BeetleWingsAndHorns.csv")
+
+#modeling
+bugs_lm <- lm(formula = wingMass ~ hornSize, data = bugs)
+bugs_lm
+summary(bugs_lm)
+resid(bugs_lm)
+```
+Plotting a residual plot
+```{r}
+bugs_res <- resid(bugs_lm)
+plot(fitted(bugs_lm), bugs_res)
+```
+It seems to me that the points are lying above and below 0, generally telling me that there is great variance in the sample with spread out points. The residual plot shows this by not having a cloud of points above and below y=0, and there is a slight curvature tail on the right. So it would fail this assumption of homogeneity of variance. 
+
+
+I would transform the data on the logarithmic scale. Because this transformation is best when the variation in y increases as x increases which is what we see in the linear model. 
+
+Do other diagnostics misbehave
+```{r}
+check_model(bugs_lm)
+```
+Yes, linearity seems to not look great and the model of fit isn't perfect but I would say the model fits okay. 
+
+## Age of teeth
+
+```{r}
+# loading in the data
+zombies <- read_csv("https://whitlockschluter.zoology.ubc.ca/wp-content/data/chapter17/chap17q30NuclearTeeth.csv")
+
+```
+
+What is the slope of the regression line
+```{r}
+zombies_lm <- lm(dateOfBirth ~ deltaC14, data = zombies)
+
+ggplot(data = zombies, mapping = aes(x = deltaC14,
+                                     y = dateOfBirth))+
+  geom_point()+
+  stat_smooth(method = lm)
+summary(zombies_lm)
+```
+The slope of the line is -5.326e-02
+
+The narrower dotted lines are the confidence bands. The confidence bands tell us the confidence interval for the predicted mean birth year for the given C14 decay.
+
+The prediction interval measures the precision of single predicted values of birth year for decay of X rather than the mean. 
+
+Use broom and geom ribbon to make the plot above showing the data, dit and both intervals.
+
+```{r}
+zombie_pred <- augment(zombies_lm,
+                       interval = "prediction")
+ggplot(data = zombies, mapping = aes(x = deltaC14,
+                                     y = dateOfBirth))+
+  geom_point()+
+  stat_smooth(method = lm)+
+  geom_ribbon(data = zombie_pred, mapping = aes(y = .fitted,
+                                                ymin = .lower,
+                                                ymax = .upper),
+              alpha = 0.1)
+
+```
+
+Meta 1:
+How well do you feel you understand the assumption testing behind a linear model? If there are elements that confuse you what are they? why?
+
+I feel pretty good about the assumptions behind linear models. I think they make sense because we are trying to make sure the data is meeting these assumptions so that we can trust the model to represent predicitons of the data. 
+
+Meta 2:
+What concepts of linear regression are the clearest for you? Which are opaque?
+
+I think meeting normality and the homogeneity of variance are the most clear and make the most sense to me while the linearity and the model fitting are most opaque however they make sense just not as much sense. 
+
+Meta 3:
+Even if you did not do the IYKYK part of this assignment, do you see how simulation can be used with a fit model? Do you feel it would be useful? Do you have gaps in your understanding about why simulation could work here?
+
+I think I have a good grasp on bootstrapping and separately have a good grasp on linear models but do not understand when I would combine the two. I am unsure when it would be the case to use simulation.
+
+Meta 4:
+This took me around 4-5 hours. 
+
+Meta 5:
+I grade myself as sufficient on this assignment because instead of building the answers from the lecture like before I had to dip into the reading for extra help. Not a bad thing but another step to understand which feels like more effort than previous lessons. 
