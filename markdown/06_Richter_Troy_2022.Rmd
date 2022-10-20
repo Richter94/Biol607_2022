@@ -1,0 +1,308 @@
+# Categorical Predictor Homework
+
+Loading in libraries
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(modelr)
+library(performance)
+library(broom)
+```
+
+Comparing Two means from mole rats energy levels.
+
+```{r}
+#Loading in molerat data
+molerat <- read_csv("https://www.zoology.ubc.ca/~whitlock/ABD/teaching/datasets/18/18e4MoleRatLayabouts.csv")
+```
+
+plotting
+
+```{r}
+molerat_plot <- molerat |> 
+  ggplot(mapping = aes(x = caste, 
+                       y = lnmass))+
+  geom_point()
+molerat_plot
+```
+
+Fitting a model
+
+```{r}
+molerat_lm <- lm(formula = lnmass ~ caste, data = molerat)
+molerat_lm
+
+check_model(molerat_lm)
+
+#checking predictions
+check_predictions(molerat_lm) |> plot()
+
+# checking linearity
+plot(molerat_lm, which = 1)
+
+# Checking HOV
+plot(molerat_lm, which = 3)
+
+# Checking normality
+check_normality(molerat_lm) |> plot(type = "qq")
+
+# Checking outliers
+check_outliers(molerat_lm) |> plot(type = "bar")
+```
+
+The model fits quite well with no real violation of assumptions here. This is probably due to the values being log values but that is just a speculation. Every assumption is pretty well met as evident by the different plot()s
+
+Comparing the two castes log mass values
+
+```{r}
+# Comparing coefficients
+tidy(molerat_lm)
+
+# comparing with a plot
+molerat_plot+
+  stat_summary(fun.data = "mean_se", color = "red")
+
+#comparing r2
+r2(molerat_lm)
+
+# comparing estimated means
+library(emmeans)
+molemeans <- emmeans(molerat_lm, specs = ~ caste)
+molemeans
+
+# comparing these means
+mole_cont <- contrast(molemeans, method = "pairwise")
+mole_cont
+
+# T.test
+t.test(lnmass ~ caste, data = molerat,
+       var.equal = TRUE,
+       conf.level= 0.95)
+
+# Publication ready plot
+library(ggsignif)
+ggplot(data = molerat, mapping = aes(x = caste,
+                                     y = lnmass,
+                                     fill = caste))+
+  
+  stat_summary(fun.data = mean_sdl, geom = "bar")+
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3)+
+  geom_point()+
+  labs(title = "Mass of Mole Rats by Class")+
+  xlab(label = "Caste")+
+  ylab(label = "Log Mass")+
+  scale_fill_brewer(palette = "Set1")+
+  geom_signif(comparisons = list(c("lazy", "worker")),
+              map_signif_level = TRUE)
+```
+
+I would say that these values are different due to the contrast performed on the estimated means. It reported back a low p value with an estimate difference of .54 and low SE. Also the estimated means reported the confidence intervals not intersecting 0 which I would interpret as these groups are different from each other. A t.test confirms this.
+
+## Comparing Many Means
+
+Data is lodgepole pinecones from different habitats Plotting the plot
+
+```{r}
+pinecones <- read_csv("https://www.zoology.ubc.ca/~whitlock/ABD/teaching/datasets/15/15q22LodgepolePineCones.csv")
+
+pinecone_plot <- pinecones |>
+  ggplot(mapping = aes(x = habitat,
+                       y = conemass,
+                       fill = habitat)) +
+  stat_summary(fun.data = mean_sdl, geom = "bar")+
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3)+
+  geom_point() +
+  scale_fill_brewer(palette = "Set1")+
+  geom_signif(comparisons = list(c("Island.Absent", "Island.Present", "Mainland.Present")),
+              map_signif_level = TRUE)+
+  scale_x_discrete(limits = rev)
+pinecone_plot
+```
+
+Fitting a model with LS and evaluate relevant assumptions.
+
+```{r}
+pinecone_lm <- lm(formula = conemass ~ habitat, data = pinecones)
+pinecone_lm
+
+# Checking assumptions
+#checking predictions
+check_predictions(pinecone_lm) |> plot()
+
+# checking linearity
+plot(pinecone_lm, which = 1)
+
+# Checking HOV
+plot(pinecone_lm, which = 3)
+
+# Checking normality
+check_normality(pinecone_lm) |> plot(type = "qq")
+
+# Checking outliers
+check_outliers(pinecone_lm) |> plot(type = "bar")
+
+```
+
+I think this data passes all of the assumptions and requires no fix. So, we can use this model.
+
+How much variation is explained by my model?
+
+```{r}
+r2(pinecone_lm)
+
+```
+
+About 86% of the variation can be explained by our model.
+
+Showing which means are different from each other.
+
+```{r}
+pinemeans <- emmeans(pinecone_lm, specs = ~ habitat)
+pinemeans
+pine_cont <- contrast(pinemeans, method = "pairwise")
+pine_cont
+
+pine_cont|>
+  plot()+
+  geom_vline(xintercept = 0, color = "red", lty = 2)
+```
+
+Using a 95% confidence Interval means were generated. And compared with the contrast function. This reported the difference in means as 2.82, 2.78 and \~0. between the 3 combos of groups. I decided to use 95% CI because the errors were low and the data were randomly collected.
+
+## Categorical Variables and Transformation
+
+Getting the data
+
+```{r}
+cages <- read_csv("https://biol607.github.io/homework/data/fouling_transplant_data.csv")
+
+cages_fix <- cages|>
+  mutate(treatment = paste(cages$Caged, cages$`Position On Block`))
+
+```
+
+Plotting the data
+
+```{r}
+cages_plot <- ggplot(data = cages_fix, mapping = aes(x = treatment,
+                                                     y = `Change in Cover`,
+                                                     fill = treatment))+ 
+  stat_summary(fun.data = mean_sdl, geom = "bar")+
+  stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.3)+
+  geom_point() +
+  scale_fill_brewer(palette = "Set1")+
+  geom_hline(yintercept = 0, color = "black")
+cages_plot  
+```
+
+Fitting amodel and exploring how treatment influences cover change and evaluating assumptions
+
+```{r}
+# Fitting a model
+cages_lm <- lm(formula = `Change in Cover` ~ treatment, data = cages_fix)
+cages_lm
+
+# Checking assumptions
+#checking predictions
+check_predictions(cages_lm) |> plot()
+
+# checking linearity
+plot(cages_lm, which = 1)
+
+# Checking HOV
+plot(cages_lm, which = 3)
+
+# Checking normality
+check_normality(cages_lm) |> plot(type = "qq")
+
+# Checking outliers
+check_outliers(cages_lm) |> plot(type = "bar")
+
+```
+
+These assumptions are not met by the resulting plots. First there is a sharp peak in the prediction plot suggesting that our model is not representing the data accurately. Second it seems that the data on the linearity plot are spread unqueally. In the HOV plot the line is jumping and hovering above 0. Suggesting that data variance is heterogenous. Normality looks okay and so does outliers.
+
+Transforming the data by dividing
+
+```{r}
+cage_lm_trans1 <- lm(formula = (`Change in Cover`/ `Initial Cover`) ~ treatment,
+                                data = cages_fix)
+cage_lm_trans1
+
+# Checking assumptions
+#checking predictions
+check_predictions(cage_lm_trans1) |> plot()
+
+# checking linearity
+plot(cage_lm_trans1, which = 1)
+
+# Checking HOV
+plot(cage_lm_trans1, which = 3)
+
+# Checking normality
+check_normality(cage_lm_trans1) |> plot(type = "qq")
+
+# Checking outliers
+check_outliers(cage_lm_trans1) |> plot(type = "bar")
+
+```
+
+Transforming the data by logit cover
+
+```{r}
+library(car)
+
+cage_lm_trans2 <- lm(formula = (logit(`Initial Cover`) - logit(`Final Cover`)) ~ treatment, data = cages_fix)
+cage_lm_trans2
+
+# Checking assumptions
+#checking predictions
+check_predictions(cage_lm_trans2) |> plot()
+
+# checking linearity
+plot(cage_lm_trans2, which = 1)
+
+# Checking HOV
+plot(cage_lm_trans2, which = 3)
+
+# Checking normality
+check_normality(cage_lm_trans2) |> plot(type = "qq")
+
+# Checking outliers
+check_outliers(cage_lm_trans2) |> plot(type = "bar")
+```
+
+I would say the first transformation worked the best because it better fit in the assumptions than the logit transformation. Going forward I would use that first transformation.
+
+Calculating the emmeans and comparing them
+
+```{r}
+cage_em <- emmeans(cage_lm_trans1, specs = ~ treatment)
+contrast(cage_em, method = "pairwise")|>
+  plot()+
+  geom_vline(xintercept = 0, color = "red", lty = 2)
+```
+
+Plotting
+
+```{r}
+library(multcomp)
+cld(cage_em, adjust="tukey")|>
+  ggplot(aes(x = treatment,
+             y = emmean,
+             ymin = lower.CL,
+             ymax = upper.CL,
+             color = factor(.group)))+
+  geom_pointrange()
+```
+
+Utlizing this graph it has used the tukey method to get groups that are different or the same. It seems like when the treatment is caged hanging or open side the percent cover is different in opposite directions than when the treatment is caged side or open hanging. Completing the data, it seems that when the panel is caged and hanging on the pvc pipe the coverage of the invetebrates are not affected but when the treatment is open and on the side of a cinderblock, the predators can eat the invetebrates and the covereage decreases.
+
+Meta 1: I am seeing the connection between linear regression and models with categorical variables. I think this week allowed me to better understand some of the meaning of the comparisons that can be made when categorical variables are used, especially more than one. This is highly advantageous to my work.
+
+Meta 2: This week in homework. The most difficult part is seperating myself from relying on p values entirely and really diving into the meaning of the comparisons and how the model fits. In the long run this is probably for the best. the boundries of my understanding are probably around emmeans and if this is reliable when writing a paper.
+
+Meta 3: This roughly took me around 5 or 6 hours split over the week.
+
+Meta 4: I would say in this week I am around sufficient in the material and this assignment because I still struggle with interpretation of the data. Especially when to change the CI values and when to keep them at 95%. I lean toward keeping them at 95% forever.
