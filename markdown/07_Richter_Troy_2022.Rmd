@@ -1,0 +1,301 @@
+# Many Types of Predictors Homework
+
+#### Multiple Linear Regression
+
+Loading in the data
+
+```{r}
+# Libraries
+library(tidyverse)
+library(ggplot2)
+library(performance)
+library(modelr)
+library(visdat)
+library(skimr)
+library(GGally)
+library(car)
+library(broom)
+library(visreg)
+library(emmeans)
+
+rikz <- read_csv("https://biol607.github.io/homework/data/rikz.csv")
+
+# selecting variables
+rikz <- rikz|>
+  select(Richness, NAP, exposure, grainsize, Beach)
+vis_dat(rikz)
+skim(rikz)
+ggpairs(rikz)
+
+ggplot(data = rikz, mapping = aes(x = grainsize,
+                                  y = Richness,
+                                  color = exposure))+
+  geom_point() +
+  scale_color_gradientn(colours = terrain.colors(10))
+```
+
+It looks as if the data is cool to proceed.
+
+Modeling richness as a function of exposure, grainsize, NAP. Evaluating assumptions and transforming if necessary.
+
+```{r}
+# Building the model
+rikz_lm <- lm(formula = Richness ~ NAP + exposure + grainsize, data = rikz)
+rikz_lm
+
+# Assumptions?
+check_model(rikz_lm)
+
+# checking each predictor for residuals
+residualPlots(rikz_lm)
+
+# what does the model mean
+tidy(rikz_lm)
+r2(rikz_lm)
+```
+
+I think this model looks pretty good and won't need any transformations.
+
+According to the tidy() function, when NAP, exposure, and grain size are set to their basal levels, Richness is 36.09. when NAP goes up one unit then richness decreases 2.79 units. When exposure goes up one unit then richness goes down 2.60 units. When grain size goes up one unit richness essentially doesn't change because the error is larger than the estimate. Finally when Beach changes one unit then richness goes down .01 units but this is very close to the error so perhaps it doesn't change at all. About 64% of the variation is explained by our predictors.
+
+Plotting individual contributions of each predictor
+
+```{r}
+#evaluating each predictor when others are at their mean
+visreg(rikz_lm)
+
+```
+
+This visualization tells us there is a stronger correlation between NAP and richness as well as exposure and richness. While the other two predictors don't change richness very much if at all. This way does show that exposure could be represented by a categorical variable with categories at 8, 10 and 11. There is no data at other points. Also beach is categorical as well.
+
+Constructing a cool viz for the data
+
+```{r}
+# Getting the CI
+rikz_pred <- data_grid(rikz,
+                       NAP = seq_range(NAP, 100),
+                       exposure = seq_range(exposure, 3),
+                       grainsize = mean(grainsize))|>
+  augment(rikz_lm, newdata = _, interval = "confidence")|>
+  rename(Richness = .fitted)
+
+# Plotting
+ggplot(data = rikz,
+       mapping = aes(x = NAP, 
+                     y = Richness, 
+                     color = exposure)) +
+  geom_point() +
+  geom_line(data = rikz_pred, aes(group = exposure, y =  Richness), color = 'blue') +
+  # geom_ribbon(data = rikz_pred, 
+  #             aes(group = exposure, ymin = .lower, ymax = .upper),
+  #             color = "lightgrey", alpha = 0.2) +
+  scale_color_gradient(low="yellow", high="red")+
+  facet_wrap(vars(cut_interval(exposure, 3)))+
+  theme_bw(base_size = 14)
+
+```
+
+here we see that Beach in combo with NAP is determining species richness.
+
+#### Multiple Categorical Variables
+
+Loading in the data, filtering out NA in sex and making sure year is not continuous. Vizzing as well.
+
+```{r}
+# Loading
+library(palmerpenguins)
+peng <- penguins
+
+# No NA in sex and year as factor
+peng <- peng |>
+  filter(!is.na(sex))|>
+  mutate(year = as.factor(year))
+
+# vizzing
+ggplot(peng, mapping = aes(x = species,
+                           y = bill_depth_mm,
+                           color = sex))+
+  geom_boxplot()+
+  facet_grid(cols = vars(year))
+```
+
+It looks cool! Without knowing I would say that males seem to have a higher bill_depth than females, while Gentoos have smaller compared to other species but getting bigger as time moves on.
+
+Modeling
+
+```{r}
+peng_lm <- lm(formula = bill_depth_mm ~ species + sex + year,
+              data = peng)
+tidy(peng_lm)
+
+# Checking the model
+check_model(peng_lm)
+```
+
+This looks good. Especially linearity as the line is flat and horizontal. But we can explore it more.
+
+```{r}
+# linearity
+plot(peng_lm, which = 1)
+
+#HOV
+plot(peng_lm, which = 3)
+```
+
+I still think these work and will continue.
+
+What does this model mean:
+
+Well, Female Adelie penguins' bill_depth_mm in 2007 were 17.7. Bill_depth_mm goes up 0.056 when species changes to chinstrap. Bill depth goes down 3.36 when species switches to Gentoo. When sex switches to male the bill depth increases 1.5. When the year increases to 2008 bill depth goes down .21 and finally when year goes to 2009 bill depth decreases 0.14.
+
+Peeking at the Emmeans
+
+```{r}
+peng_em_sp <- emmeans(peng_lm, ~ species)
+peng_em_sp |>
+  contrast(method = 'pairwise')|>
+  confint()
+
+peng_em_se <- emmeans(peng_lm, ~ sex)
+peng_em_se |>
+  contrast(method = 'pairwise')|>
+  confint()
+
+peng_em_yr <- emmeans(peng_lm, ~ year)
+peng_em_yr |>
+  contrast(method = 'pairwise')|>
+  confint()
+```
+
+It looks like sex and species are effecting the bill depth length the most.
+
+Vizzing
+
+```{r}
+# Plotting
+peng_em_se_plot <- peng_em_se |>
+  confint() |>
+  as_tibble()
+
+peng_plot_sex <- ggplot(data = peng,
+                    aes(x = sex, y = bill_depth_mm)) +
+  geom_point()
+
+peng_plot_sex +
+  geom_pointrange(data = peng_em_se_plot,
+                  aes(y = emmean,
+                      ymin = lower.CL,
+                      ymax = upper.CL),
+                  color = "red")
+  
+# For species
+peng_em_sp_plot <- peng_em_sp |>
+  confint() |>
+  as_tibble()
+
+peng_plot_species <- ggplot(data = peng,
+                    aes(x = species, y = bill_depth_mm)) +
+  geom_point()
+
+peng_plot_species +
+  geom_pointrange(data = peng_em_sp_plot,
+                  aes(y = emmean,
+                      ymin = lower.CL,
+                      ymax = upper.CL),
+                  color = "red")
+```
+
+## Comparing Means with Covariates
+
+Data and plotting
+
+```{r}
+# Loading data
+caste <- read_csv('https://www.zoology.ubc.ca/~whitlock/ABD/teaching/datasets/18/18e4MoleRatLayabouts.csv')
+
+qplot(lnmass, lnenergy, color = caste, data = caste)+
+  stat_smooth(method = 'lm')
+
+
+
+```
+
+It seems like the covariate of lnmass could be effecting the lnenergy as these lines may not be parallel.
+
+Fitting a model and testing assumptions
+
+```{r}
+# Model
+caste_lm <- lm(formula = lnenergy ~ lnmass + caste, data = caste)
+tidy(caste_lm)
+
+# Assumptions 
+#checking predictions
+check_predictions(caste_lm) |> plot()
+
+# checking linearity
+plot(caste_lm, which = 1)
+
+# Checking HOV
+plot(caste_lm, which = 3)
+
+# Checking normality
+check_normality(caste_lm) |> plot(type = "qq")
+
+# Checking outliers
+check_outliers(caste_lm) |> plot(type = "bar")
+
+# Checking VIF
+check_collinearity(caste_lm) |> plot()
+```
+
+We are checking collinearity and it seems to pass every assumption in my opinion.
+
+Checking the mean when mass is at the mean.
+
+```{r}
+visreg(caste_lm)
+```
+
+They appear different to me. This would suggest that workers use more energy than lazy mole rats which makes sense.
+
+Taking a look at emmeans
+
+```{r}
+avg_lnmass_em <- emmeans(caste_lm, ~ caste|lnmass)
+avg_lnmass_em
+
+contrast(avg_lnmass_em, method = 'pairwise')|>
+  confint()
+```
+
+After looking at the emmeans when lnmass is at the average, I would say that these groups might not be different because the confidence intervals are overlapping zero.
+
+Fitting the model
+
+```{r}
+caste_pred <- augment(caste_lm, interval = 'confidence')
+
+
+# Plotting
+
+ggplot(data = caste_pred, mapping = aes(x = lnmass, color = caste))+
+  geom_point(mapping = aes(y = lnenergy))+
+  geom_line(mapping = aes(y = .fitted))+
+  geom_ribbon(mapping = aes(ymin = .lower,
+                            ymax = .upper,
+                            group = caste),
+              fill = "lightgrey",
+              alpha = 0.5,
+              color = NA)
+```
+
+Meta 1: I think from here we will go to generalized linear models or perhaps inferential statistics. So two way anovas with and without interactions. I think the next homework is interactions.
+
+Meta 2: I think models like these will be interesting in my work as I have data without interaction but has two predictors. So I think this weeks homework directly relates to that data. It is a comparison in the gene expression of one type of ncRNA after rat pups got different housing environments and/or different treatments to induce stress.
+
+Meta 3: I think the hardest thing for me to understand is the prediction model. I think it is a way to query the model for made up data but it is hard for me to create/visualize it in my head.
+
+Meta 4: This roughly took me around 4 hours to complete perhaps 5.
+
+Meta 5: I feel strong in this assignment. Especially with the first one and the last one. I like categorical variables more than continuous. Perhaps thats why I am a behavioral Neuroscientist.
