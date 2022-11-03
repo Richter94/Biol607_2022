@@ -1,0 +1,125 @@
+# Interactions Homework
+## Replicated Regression and Interaction Effects
+
+Loading the data from kelp
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(performance)
+library(modelr)
+library(visdat)
+library(skimr)
+library(GGally)
+library(car)
+library(broom)
+library(visreg)
+library(emmeans)
+# Load the data
+kelp <- read.csv('https://biol607.github.io/lab/data/kelp_pred_div_byrnesetal2006.csv')
+
+kelp <- kelp|>
+  filter(!is.na(Predator_Diversity))|>
+  mutate(Trial = as.factor(Trial),
+         Predator_Diversity = as.numeric(Predator_Diversity))
+
+# Fit a model with an interaction/continuous
+kelp_lm_c <- lm(Porp_Change ~ Predator_Diversity * Trial, data = kelp)
+tidy(kelp_lm_c)
+r2(kelp_lm_c)
+
+# discrete
+kelp_d <- kelp|>
+  mutate(Predator_Diversity = as.factor(Predator_Diversity))
+kelp_lm_d <- lm(Porp_Change ~ Predator_Diversity * Trial, data = kelp_d)
+tidy(kelp_lm_d)
+r2(kelp_lm_d)
+
+# Test Asssumptions and modify model if needed
+check_model(kelp_lm_c)
+check_model(kelp_lm_d)
+
+# Evaluate results
+
+# Visualize results
+```
+It appears as if the continuous is the best at meeting assumptions as the discrete model has some wonky HOV and collinearity as well, there also is variation in the data in the linearity assumption plot so, I will stick with the continuous version. 
+
+Comparing the results with both models: Discrete/Continuous
+```{r}
+# Continuous Comparison
+visreg(kelp_lm_c, "Predator_Diversity", "Trial", gg=T)
+visreg(kelp_lm_d, "Predator_Diversity", "Trial", gg=T)
+# These are showing us that there could be no interaction between these two predictors
+
+kelp_em_c <- emmeans(kelp_lm_c, specs = ~ Predator_Diversity|Trial)
+kelp_em_c |> plot()
+
+# Discrete Comparison
+kelp_em_d <- emmeans(kelp_lm_d, specs = ~ Trial | Predator_Diversity)|>
+  contrast(method = "pairwise")|>
+  confint(adjust = "none")|>
+  plot()
+kelp_em_d
+
+emtrends(kelp_lm_c, ~ Trial, var = "Predator_Diversity")
+
+```
+It appears, from the visreg plots, that there could not be an interaction between Predator_Diversity and Trial. As the slopes of the model lines appear to be the same with no intercept. 
+
+```{r}
+# Refitting the model to have no interaction
+kelp_lm_no <- lm(Porp_Change ~ Predator_Diversity + Trial, data = kelp)
+tidy(kelp_lm_no)
+r2(kelp_lm_no)
+
+check_model(kelp_lm_no)
+
+visreg(kelp_lm_no, "Predator_Diversity", "Trial", gg=T)
+```
+It appears as though proportional change of kelp is changing along with predator_Diversity in a positive manner. In other words, when there is a greater diversity of predators, then herbivores are being eaten and kelp is allowed to grow indicated by the positive slope of the model. This is true regardless of trial since there is no interaction effect detected. 
+
+## Interaction with Continuous Variables
+
+```{r}
+sims <- read_csv('https://biol607.github.io/homework/data/c_burial_sims.csv')
+str(sims)
+ggpairs(sims)
+
+#model
+sims_lm <- lm(net_carbon_sequestration ~ sink_rate * microbial_abundance * detritivore_biomass, data = sims)
+tidy(sims_lm)
+r2(sims_lm)
+
+check_model(sims_lm)
+
+```
+Model looks nice!
+
+```{r}
+visreg(sims_lm, "sink_rate", "microbial_abundance", gg = TRUE)
+visreg(sims_lm, "sink_rate", "detritivore_biomass", gg = TRUE)
+visreg(sims_lm, "microbial_abundance", "detritivore_biomass", gg = TRUE)
+
+visreg(sims_lm, "sink_rate", "microbial_abundance", cond = list(detritivore_biomass = 1.187), gg = T)
+
+visreg(sims_lm, "sink_rate", "microbial_abundance", cond = list(detritivore_biomass = 3.224), gg = T)
+
+```
+I used visreg to visualize the sink net carbon sequestration change when sink rate changes at different levels of microbial abundance. This shows what the interaction effect between these two variables looks like when detritivore biomass is set at its 3rd quartile. This value can be changed to any value to inspect the interaction between these three independent variables. It appears as if there is a strong interaction between all three of these predictors. When detritivore biomass is at its 3rd quartile and microbial abundance increases net carbon sequestration decreases when the sink rate increases. In other words when sink rate is low and and microb abundance is low and detritivore biomass is highish then sequestration is high. But when the biomass is high and sink rate is high and the abundance is high then the sequestration is low. Phew!
+
+Meta 1:
+Interaction effects are interesting because it attempts to explain a phenomenon of nature in a more complex way which is often the case with nature. It can show you the change in something when something else is affecting that change. It can get scary when there are more than 2 predictors. 
+
+Meta 2:
+In my research there are many interaction effects that could play a role. For example I can give a treatment to cells or rats and there could be an interaction whether the cells or the rat sex is male or female. 
+
+Meta 3:
+I have a hard time understanding how to model the mean slopes in the linear models. My problems are more on the side of coding rather than the theory side.
+
+Meta 4:
+This took me roughly 3 hours to complete with a partner.
+
+Meta 5:
+I would say I am sufficient on this assignment because I can't quite evaluate the models that well, like I am uncomfortable when the question on the homework is asking whether the model fits well or if there is an interaction or what the coefficients mean when there are interaction effects or more than 3 predictors for interaction effects. It still seems like a subjective method rather than objective (p-values). Old habits die hard I guess. 
+
+Also hard for me to determine if there is a true difference in means rather than something that could or could not be a difference. 
